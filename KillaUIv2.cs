@@ -8,6 +8,14 @@
  * - Clean separation of concerns
  * - Easy to maintain and extend
  * 
+ * DEPENDENCIES:
+ * - KillaDome.cs (REQUIRED): Provides game logic and data for this UI
+ * - ImageLibrary (OPTIONAL): For weapon/item images
+ * 
+ * LOAD ORDER:
+ * - KillaUIv2 must be loaded after or at the same time as KillaDome
+ * - Both plugins reference each other (circular dependency is handled safely)
+ * 
  * Version: 2.0.0
  * Author: KillaDome Dev Team
  */
@@ -28,6 +36,8 @@ namespace Oxide.Plugins
     {
         #region Fields
         
+        // KillaDome is required for game logic and data
+        // This plugin provides player profiles, loadouts, tokens, etc.
         [PluginReference]
         private Plugin KillaDome;
         
@@ -217,7 +227,8 @@ namespace Oxide.Plugins
         {
             if (KillaDome == null || !KillaDome.IsLoaded)
             {
-                PrintWarning("[KillaUIv2] KillaDome plugin not found! UI will not function.");
+                PrintWarning("[KillaUIv2] KillaDome plugin not found! UI will not function properly.");
+                PrintWarning("[KillaUIv2] Please ensure KillaDome.cs is installed in your plugins folder.");
                 return;
             }
             
@@ -243,6 +254,14 @@ namespace Oxide.Plugins
         public void ShowLobbyUI(BasePlayer player)
         {
             if (player == null || !player.IsConnected) return;
+            
+            // Check if KillaDome is available
+            if (KillaDome == null || !KillaDome.IsLoaded)
+            {
+                Puts($"[KillaUIv2] Cannot show UI for {player.displayName} - KillaDome plugin not loaded");
+                player.ChatMessage("⚠️ Game logic plugin (KillaDome) not loaded. UI unavailable.");
+                return;
+            }
             
             Puts($"[KillaUIv2] ShowLobbyUI called for {player.displayName}");
             
