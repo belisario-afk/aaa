@@ -442,18 +442,18 @@ namespace Oxide.Plugins
         
         private void RenderPlayTab(CuiElementContainer container, string parent, BasePlayer player)
         {
-            // Get session data from KillaDome
-            var sessionData = KillaDome?.Call("GetSessionData", player.userID) as Dictionary<string, object>;
+            // Get player profile data from KillaDome for stats
+            var profileData = KillaDome?.Call("GetPlayerProfile", player.userID) as Dictionary<string, object>;
             
             int tokens = 0;
             int kills = 0;
             float kd = 0f;
             
-            if (sessionData != null)
+            if (profileData != null)
             {
-                tokens = Convert.ToInt32(sessionData.ContainsKey("tokens") ? sessionData["tokens"] : 0);
-                kills = Convert.ToInt32(sessionData.ContainsKey("totalKills") ? sessionData["totalKills"] : 0);
-                int deaths = Convert.ToInt32(sessionData.ContainsKey("totalDeaths") ? sessionData["totalDeaths"] : 0);
+                tokens = Convert.ToInt32(profileData.ContainsKey("Tokens") ? profileData["Tokens"] : 0);
+                kills = Convert.ToInt32(profileData.ContainsKey("TotalKills") ? profileData["TotalKills"] : 0);
+                int deaths = Convert.ToInt32(profileData.ContainsKey("TotalDeaths") ? profileData["TotalDeaths"] : 0);
                 kd = deaths > 0 ? (float)kills / deaths : kills;
             }
             
