@@ -9,6 +9,14 @@
  * - Store integration (Tebex-compatible)
  * - High performance, GC-friendly architecture
  * 
+ * DEPENDENCIES:
+ * - KillaUIv2.cs (REQUIRED): Provides the user interface for this plugin
+ * - ImageLibrary (OPTIONAL): For weapon/item images
+ * 
+ * LOAD ORDER:
+ * - KillaDome must be loaded first or at the same time as KillaUIv2
+ * - Both plugins reference each other (circular dependency is handled safely)
+ * 
  * Version: 1.0.0
  * Author: KillaDome Dev Team
  */
@@ -35,11 +43,8 @@ namespace Oxide.Plugins
         [PluginReference]
         private Plugin ImageLibrary;
         
-        // DEPRECATED: KillaUI v1 is no longer used. Use KillaUIv2 instead.
-        // Kept for backward compatibility only. Will be removed in future version.
-        [PluginReference]
-        private Plugin KillaUI;
-        
+        // KillaUIv2 is required for UI functionality
+        // This plugin provides the user interface for the lobby, loadouts, store, etc.
         [PluginReference]
         private Plugin KillaUIv2;
         
@@ -528,16 +533,17 @@ namespace Oxide.Plugins
         private void OnServerInitialized()
         {
             Puts("[KillaDome] OnServerInitialized called");
-            Puts($"[KillaDome] KillaUI reference is null: {KillaUI == null}");
-            Puts($"[KillaDome] KillaUI is loaded: {KillaUI?.IsLoaded}");
+            Puts($"[KillaDome] KillaUIv2 reference is null: {KillaUIv2 == null}");
+            Puts($"[KillaDome] KillaUIv2 is loaded: {KillaUIv2?.IsLoaded}");
             
-            if (KillaUI != null && KillaUI.IsLoaded)
+            if (KillaUIv2 != null && KillaUIv2.IsLoaded)
             {
-                Puts("[KillaDome] Successfully connected to KillaUI plugin");
+                Puts("[KillaDome] Successfully connected to KillaUIv2 plugin");
             }
             else
             {
-                PrintWarning("[KillaDome] KillaUI plugin not found or not loaded. UI features will not work.");
+                PrintWarning("[KillaDome] KillaUIv2 plugin not found or not loaded. UI features will not work.");
+                PrintWarning("[KillaDome] Please ensure KillaUIv2.cs is installed in your plugins folder.");
             }
             
             timer.Every(_config.AutoSaveInterval, () => AutoSaveAllPlayers());
@@ -587,14 +593,14 @@ namespace Oxide.Plugins
         
         private void Unload()
         {
-            // Clean up all UI - delegate to KillaUI plugin
-            if (KillaUI != null && KillaUI.IsLoaded)
+            // Clean up all UI - delegate to KillaUIv2 plugin
+            if (KillaUIv2 != null && KillaUIv2.IsLoaded)
             {
                 try
                 {
                     foreach (var player in BasePlayer.activePlayerList)
                     {
-                        KillaUI.Call("DestroyUI", player);
+                        KillaUIv2.Call("DestroyUI", player);
                     }
                 }
                 catch (Exception ex)
@@ -629,18 +635,25 @@ namespace Oxide.Plugins
                 // Teleport to lobby
                 TeleportToLobby(player);
                 
-                // Show lobby UI via KillaUI plugin
+                // Show lobby UI via KillaUIv2 plugin
                 timer.Once(1f, () =>
                 {
-                    if (player != null && player.IsConnected && KillaUI != null && KillaUI.IsLoaded)
+                    if (player != null && player.IsConnected && KillaUIv2 != null && KillaUIv2.IsLoaded)
                     {
                         try
                         {
-                            KillaUI.Call("ShowLobbyUI", player);
+                            KillaUIv2.Call("ShowLobbyUI", player);
                         }
                         catch (Exception ex)
                         {
                             PrintError($"Error showing lobby UI on connect: {ex}");
+                        }
+                    }
+                    else if (KillaUIv2 == null || !KillaUIv2.IsLoaded)
+                    {
+                        if (player != null && player.IsConnected)
+                        {
+                            SendReply(player, "⚠️ UI plugin not loaded. UI features unavailable.");
                         }
                     }
                 });
@@ -653,10 +666,17 @@ namespace Oxide.Plugins
         {
             if (player == null) return;
             
-            // Destroy UI via KillaUI plugin
-            if (KillaUI != null && KillaUI.IsLoaded)
+            // Destroy UI via KillaUIv2 plugin
+            if (KillaUIv2 != null && KillaUIv2.IsLoaded)
             {
-                KillaUI.Call("DestroyUI", player);
+                try
+                {
+                    KillaUIv2.Call("DestroyUI", player);
+                }
+                catch (Exception ex)
+                {
+                    PrintWarning($"Error destroying UI on disconnect: {ex.Message}");
+                }
             }
             
             if (_activeSessions.TryGetValue(player.userID, out var session))
@@ -952,11 +972,11 @@ namespace Oxide.Plugins
                 return;
             }
             
-            if (KillaUI != null && KillaUI.IsLoaded)
+            if (KillaUIv2 != null && KillaUIv2.IsLoaded)
             {
                 try
                 {
-                    KillaUI.Call("ShowLobbyUI", player);
+                    KillaUIv2.Call("ShowLobbyUI", player);
                     SendReply(arg, "Lobby UI opened");
                 }
                 catch (Exception ex)
@@ -967,7 +987,7 @@ namespace Oxide.Plugins
             }
             else
             {
-                SendReply(arg, "KillaUI plugin not loaded");
+                SendReply(arg, "KillaUIv2 plugin not loaded. Please ensure KillaUIv2.cs is installed.");
             }
         }
         
@@ -1078,7 +1098,7 @@ namespace Oxide.Plugins
                 case "open":
                 case "v2":
                 case "openv2":
-                    // Phase 7: Redirecting all commands to KillaUIv2 (new UI)
+                    // Redirecting all commands to KillaUIv2 (new UI)
                     if (KillaUIv2 != null && KillaUIv2.IsLoaded)
                     {
                         try
@@ -1095,7 +1115,8 @@ namespace Oxide.Plugins
                     }
                     else
                     {
-                        SendReply(player, "KillaUIv2 plugin not loaded");
+                        SendReply(player, "⚠️ KillaUIv2 plugin not loaded. UI features unavailable.");
+                        SendReply(player, "Please contact an administrator to install KillaUIv2.cs");
                         PrintWarning($"KillaUIv2 plugin not available. KillaUIv2: {KillaUIv2}, IsLoaded: {KillaUIv2?.IsLoaded}");
                     }
                     break;
@@ -1103,8 +1124,8 @@ namespace Oxide.Plugins
                 case "v1":
                 case "old":
                 case "legacy":
-                    // Deprecated: Old UI support (KillaUI v1)
-                    SendReply(player, "⚠️ DEPRECATED: The old UI has been replaced.\n" +
+                    // Deprecated: Old UI support removed
+                    SendReply(player, "⚠️ DEPRECATED: The old UI (KillaUI v1) has been removed.\n" +
                         "Use /kd open for the new improved UI.");
                     PrintWarning($"Player {player.displayName} attempted to use deprecated KillaUI v1");
                     break;
